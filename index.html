@@ -3,31 +3,547 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Single Particle</title>
+
+  <title>Particle Artist Landing Page</title>
+
+  <!-- Keep your music links here for SEO / metadata -->
+  <!-- Replace these with your real links -->
+  <meta name="apple-music" content="PASTE_APPLE_MUSIC_LINK_HERE" />
+  <meta name="spotify" content="PASTE_SPOTIFY_LINK_HERE" />
+  <meta name="youtube" content="PASTE_YOUTUBE_LINK_HERE" />
+
   <style>
+    html,
     body {
       margin: 0;
       width: 100%;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-color: #070010;
+      height: 100%;
+      overflow: hidden;
+      background: #070010;
     }
 
-    /* This is the particle */
-    .particle {
-      width: 100px;
-      height: 100px;
-      background: white;
-      border-radius: 50%;
-      box-shadow: 0 0 50px 20px rgba(255, 255, 255, 0.8);
+    body {
+      background:
+        radial-gradient(circle at 50% 45%, rgba(178, 80, 255, 0.28), transparent 30%),
+        radial-gradient(circle at 20% 20%, rgba(106, 36, 255, 0.32), transparent 35%),
+        radial-gradient(circle at 80% 80%, rgba(42, 0, 92, 0.7), transparent 40%),
+        linear-gradient(145deg, #05000c 0%, #130026 42%, #2a0050 100%);
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .hidden-links {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
     }
   </style>
 </head>
+
 <body>
+  <!-- Keep your real artist/music links here if needed. They will not show on the page. -->
+  <nav class="hidden-links" aria-label="Music links">
+    <a href="PASTE_SPOTIFY_LINK_HERE">Spotify</a>
+    <a href="PASTE_APPLE_MUSIC_LINK_HERE">Apple Music</a>
+    <a href="PASTE_YOUTUBE_LINK_HERE">YouTube</a>
+  </nav>
 
-  <div class="particle"></div>
+  <canvas id="stage"></canvas>
 
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+    /*
+      IMPORTANT:
+      Upload your image to the same GitHub folder as this index.html file.
+
+      Example:
+      index.html
+      face_chest.png
+
+      Then keep this path:
+    */
+    const IMAGE_PATH = "./face_chest.png";
+
+    const CONFIG = {
+      particleCount: 52000,
+      sampleWidth: 360,
+      particleSize: 2.15,
+      imageScale: 3.45,
+      depth: 140,
+      turbulence: 48,
+      driftDistance: 210,
+      breathing: 24,
+      glowStrength: 0.72
+    };
+
+    const canvas = document.getElementById("stage");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(38, 1, 1, 4000);
+    camera.position.z = 1150;
+
+    let particles;
+    let material;
+    let imageAspect = 1;
+
+    init();
+
+    async function init() {
+      resize();
+
+      const image = await loadImage(IMAGE_PATH);
+      const particleData = imageToParticles(image);
+
+      createParticles(particleData);
+
+      window.addEventListener("resize", resize);
+      renderer.setAnimationLoop(animate);
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+
+        /*
+          GitHub Pages is fine.
+          Local double-clicking may fail because browser security blocks canvas pixel reading.
+          Use a local server if testing locally.
+        */
+        img.crossOrigin = "anonymous";
+
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Could not load image: " + src));
+        img.src = src;
+      });
+    }
+
+    function imageToParticles(img) {
+      const sampleWidth = CONFIG.sampleWidth;
+      const sampleHeight = Math.round(sampleWidth * (img.height / img.width));
+      imageAspect = sampleWidth / sampleHeight;
+
+      const c = document.createElement("canvas");
+      c.width = sampleWidth;
+      c.height = sampleHeight;
+
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, sampleWidth, sampleHeight);
+
+      const pixels = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+
+      const bg = getBackgroundColor(pixels, sampleWidth, sampleHeight);
+      const candidates = [];
+
+      for (let y = 0; y < sampleHeight; y += 1) {
+        for (let x = 0; x < sampleWidth; x += 1) {
+          const i = (y * sampleWidth + x) * 4;
+
+          const r = pixels[i] / 255;
+          const g = pixels[i + 1] / 255;
+          const b = pixels[i + 2] / 255;
+          const a = pixels[i + 3] / 255;
+
+          const lum = r * 0.2126 + g * 0.7152 + b * 0.0722;
+          const bgDistance = colorDistance(r, g, b, bg.r, bg.g, bg.b);
+
+          /*
+            This removes the purple background and keeps the person.
+            Increase 0.185 if you still see too much background.
+            Decrease it if too much of the body disappears.
+          */
+          const subjectMask = smoothstep(0.105, 0.275, bgDistance);
+
+          /*
+            Keep dark hair / lingerie strong instead of letting it vanish.
+          */
+          const darkDetailBoost = smoothstep(0.55, 0.12, lum) * 0.42;
+
+          const density = Math.min(1, subjectMask + darkDetailBoost) * a;
+
+          if (density > 0.16 && Math.random() < density) {
+            const px = (x - sampleWidth / 2) * CONFIG.imageScale;
+            const py = (sampleHeight / 2 - y) * CONFIG.imageScale;
+            const pz = (Math.random() - 0.5) * CONFIG.depth;
+
+            const color = enhanceColor(r, g, b, lum);
+
+            candidates.push({
+              x: px,
+              y: py,
+              z: pz,
+              r: color.r,
+              g: color.g,
+              b: color.b,
+              density
+            });
+          }
+        }
+      }
+
+      shuffle(candidates);
+      return candidates.slice(0, CONFIG.particleCount);
+    }
+
+    function getBackgroundColor(data, w, h) {
+      const samples = [];
+      const margin = 14;
+
+      const points = [
+        [margin, margin],
+        [w - margin, margin],
+        [margin, h - margin],
+        [w - margin, h - margin],
+        [w / 2, margin],
+        [w / 2, h - margin]
+      ];
+
+      for (const [xRaw, yRaw] of points) {
+        const x = Math.floor(xRaw);
+        const y = Math.floor(yRaw);
+        const i = (y * w + x) * 4;
+
+        samples.push({
+          r: data[i] / 255,
+          g: data[i + 1] / 255,
+          b: data[i + 2] / 255
+        });
+      }
+
+      return {
+        r: samples.reduce((s, v) => s + v.r, 0) / samples.length,
+        g: samples.reduce((s, v) => s + v.g, 0) / samples.length,
+        b: samples.reduce((s, v) => s + v.b, 0) / samples.length
+      };
+    }
+
+    function enhanceColor(r, g, b, lum) {
+      /*
+        Premium purple/cinematic grading.
+        Keeps skin readable, makes dark hair visible, avoids ugly gray dots.
+      */
+      const purpleLift = 0.14;
+      const brightness = 0.45 + lum * 0.95;
+
+      return {
+        r: Math.min(1, r * brightness + 0.20),
+        g: Math.min(1, g * brightness + 0.06),
+        b: Math.min(1, b * brightness + purpleLift)
+      };
+    }
+
+    function createParticles(data) {
+      const count = data.length;
+
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const randoms = new Float32Array(count);
+      const sizes = new Float32Array(count);
+
+      for (let i = 0; i < count; i++) {
+        const p = data[i];
+        const i3 = i * 3;
+
+        positions[i3] = p.x;
+        positions[i3 + 1] = p.y;
+        positions[i3 + 2] = p.z;
+
+        colors[i3] = p.r;
+        colors[i3 + 1] = p.g;
+        colors[i3 + 2] = p.b;
+
+        randoms[i] = Math.random() * 1000;
+        sizes[i] = 0.55 + Math.random() * 1.65;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geometry.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
+      geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+
+      material = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
+        uniforms: {
+          uTime: { value: 0 },
+          uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+          uParticleSize: { value: CONFIG.particleSize },
+          uTurbulence: { value: CONFIG.turbulence },
+          uDriftDistance: { value: CONFIG.driftDistance },
+          uBreathing: { value: CONFIG.breathing }
+        },
+        vertexShader: `
+          attribute float aRandom;
+          attribute float aSize;
+
+          varying vec3 vColor;
+          varying float vAlpha;
+
+          uniform float uTime;
+          uniform float uPixelRatio;
+          uniform float uParticleSize;
+          uniform float uTurbulence;
+          uniform float uDriftDistance;
+          uniform float uBreathing;
+
+          vec3 mod289(vec3 x) {
+            return x - floor(x * (1.0 / 289.0)) * 289.0;
+          }
+
+          vec4 mod289(vec4 x) {
+            return x - floor(x * (1.0 / 289.0)) * 289.0;
+          }
+
+          vec4 permute(vec4 x) {
+            return mod289(((x * 34.0) + 1.0) * x);
+          }
+
+          vec4 taylorInvSqrt(vec4 r) {
+            return 1.79284291400159 - 0.85373472095314 * r;
+          }
+
+          float snoise(vec3 v) {
+            const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+            const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+            vec3 i = floor(v + dot(v, C.yyy));
+            vec3 x0 = v - i + dot(i, C.xxx);
+
+            vec3 g = step(x0.yzx, x0.xyz);
+            vec3 l = 1.0 - g;
+            vec3 i1 = min(g.xyz, l.zxy);
+            vec3 i2 = max(g.xyz, l.zxy);
+
+            vec3 x1 = x0 - i1 + C.xxx;
+            vec3 x2 = x0 - i2 + C.yyy;
+            vec3 x3 = x0 - D.yyy;
+
+            i = mod289(i);
+            vec4 p = permute(
+              permute(
+                permute(i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                + i.y + vec4(0.0, i1.y, i2.y, 1.0)
+              )
+              + i.x + vec4(0.0, i1.x, i2.x, 1.0)
+            );
+
+            float n_ = 0.142857142857;
+            vec3 ns = n_ * D.wyz - D.xzx;
+
+            vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+            vec4 x_ = floor(j * ns.z);
+            vec4 y_ = floor(j - 7.0 * x_);
+
+            vec4 x = x_ * ns.x + ns.yyyy;
+            vec4 y = y_ * ns.x + ns.yyyy;
+            vec4 h = 1.0 - abs(x) - abs(y);
+
+            vec4 b0 = vec4(x.xy, y.xy);
+            vec4 b1 = vec4(x.zw, y.zw);
+
+            vec4 s0 = floor(b0) * 2.0 + 1.0;
+            vec4 s1 = floor(b1) * 2.0 + 1.0;
+            vec4 sh = -step(h, vec4(0.0));
+
+            vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+            vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+            vec3 p0 = vec3(a0.xy, h.x);
+            vec3 p1 = vec3(a0.zw, h.y);
+            vec3 p2 = vec3(a1.xy, h.z);
+            vec3 p3 = vec3(a1.zw, h.w);
+
+            vec4 norm = taylorInvSqrt(vec4(
+              dot(p0, p0),
+              dot(p1, p1),
+              dot(p2, p2),
+              dot(p3, p3)
+            ));
+
+            p0 *= norm.x;
+            p1 *= norm.y;
+            p2 *= norm.z;
+            p3 *= norm.w;
+
+            vec4 m = max(
+              0.6 - vec4(
+                dot(x0, x0),
+                dot(x1, x1),
+                dot(x2, x2),
+                dot(x3, x3)
+              ),
+              0.0
+            );
+
+            m = m * m;
+
+            return 42.0 * dot(
+              m * m,
+              vec4(
+                dot(p0, x0),
+                dot(p1, x1),
+                dot(p2, x2),
+                dot(p3, x3)
+              )
+            );
+          }
+
+          float pulse(float x) {
+            float s = sin(x) * 0.5 + 0.5;
+            return pow(s, 7.0);
+          }
+
+          void main() {
+            vColor = color;
+
+            vec3 p = position;
+
+            float t = uTime;
+            float r = aRandom;
+
+            vec3 noisePosition = vec3(
+              p.x * 0.004 + r,
+              p.y * 0.004 - r,
+              t * 0.18
+            );
+
+            float n1 = snoise(noisePosition);
+            float n2 = snoise(noisePosition + vec3(31.7, 11.2, 4.6));
+            float n3 = snoise(noisePosition + vec3(8.3, 42.1, 17.9));
+
+            vec3 turbulence = vec3(n1, n2, n3) * uTurbulence;
+
+            vec3 fromCenter = normalize(vec3(p.xy, p.z * 0.35) + 0.001);
+
+            float driftPulse = pulse(t * 0.22 + r * 4.0);
+            float drift = driftPulse * uDriftDistance;
+
+            float breathe = sin(t * 1.1 + r) * uBreathing;
+
+            float swirlAmount = sin(t * 0.38 + r) * 0.075;
+            mat2 rot = mat2(
+              cos(swirlAmount), -sin(swirlAmount),
+              sin(swirlAmount), cos(swirlAmount)
+            );
+
+            vec3 finalPosition = p;
+            finalPosition.xy = rot * finalPosition.xy;
+            finalPosition += turbulence;
+            finalPosition += fromCenter * drift;
+            finalPosition.z += breathe + sin(t * 0.7 + r * 2.0) * 35.0;
+
+            vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
+            gl_Position = projectionMatrix * mvPosition;
+
+            float depthScale = 900.0 / max(300.0, -mvPosition.z + 900.0);
+            gl_PointSize = uParticleSize * aSize * uPixelRatio * depthScale;
+
+            vAlpha = 0.58 + driftPulse * 0.35;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vColor;
+          varying float vAlpha;
+
+          void main() {
+            vec2 uv = gl_PointCoord - vec2(0.5);
+            float d = length(uv);
+
+            float circle = smoothstep(0.5, 0.08, d);
+            float core = smoothstep(0.18, 0.0, d);
+
+            vec3 color = vColor + core * 0.35;
+
+            gl_FragColor = vec4(color, circle * vAlpha);
+          }
+        `
+      });
+
+      particles = new THREE.Points(geometry, material);
+      scene.add(particles);
+    }
+
+    function animate(time) {
+      if (!particles) return;
+
+      const t = time * 0.001;
+
+      material.uniforms.uTime.value = t;
+
+      particles.rotation.y = Math.sin(t * 0.18) * 0.09;
+      particles.rotation.x = Math.sin(t * 0.13) * 0.035;
+      particles.rotation.z = Math.sin(t * 0.09) * 0.018;
+
+      renderer.render(scene, camera);
+    }
+
+    function resize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      camera.aspect = w / h;
+
+      if (w < 700) {
+        camera.position.z = 1450;
+      } else if (w < 1100) {
+        camera.position.z = 1250;
+      } else {
+        camera.position.z = 1120;
+      }
+
+      camera.updateProjectionMatrix();
+
+      if (material) {
+        material.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+      }
+    }
+
+    function colorDistance(r1, g1, b1, r2, g2, b2) {
+      const dr = r1 - r2;
+      const dg = g1 - g2;
+      const db = b1 - b2;
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    function smoothstep(edge0, edge1, x) {
+      const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+      return t * t * (3 - 2 * t);
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = array[i];
+        array[i] = array[j];
+        array[j] = tmp;
+      }
+    }
+  </script>
 </body>
 </html>
