@@ -3,28 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AKIRO LAINE // OFFICIAL ARCHIVE</title>
+    <title>Akiro Laine | Official Hub</title>
     <style>
+        /* Dark Cyberpunk / High-Fashion Aesthetic */
         :root {
-            --bg-color: #060608;
-            --card-bg: rgba(10, 10, 15, 0.65);
-            --neon-pink: #ff0055;
-            --neon-cyan: #00f3ff;
-            --text-main: #f5f5f7;
-            --text-dim: #8e8e93;
-            --gold-accent: #d4af37;
+            --bg-color: #0a0a0c;
+            --panel-bg: rgba(15, 15, 20, 0.75);
+            --text-color: #e2e2e9;
+            --accent-cyan: #00f2ff;
+            --accent-glow: rgba(0, 242, 255, 0.2);
+            --border-glass: rgba(255, 255, 255, 0.08);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
-            color: var(--text-main);
+            color: var(--text-color);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -32,158 +32,197 @@
             padding: 20px;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(circle at 15% 20%, rgba(255, 0, 85, 0.08) 0%, transparent 45%),
-                radial-gradient(circle at 85% 80%, rgba(0, 243, 255, 0.08) 0%, transparent 45%);
+                radial-gradient(circle at 10% 20%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.05) 0%, transparent 40%);
         }
 
-        .container {
+        /* Glassmorphic Container */
+        .hub-container {
+            display: flex;
+            flex-direction: row;
             width: 100%;
-            max-width: 440px;
-            background: var(--card-bg);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border: 1px solid rgba(255, 255, 255, 0.04);
-            border-radius: 28px;
-            padding: 40px 30px;
-            text-align: center;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 50px rgba(255, 0, 85, 0.02);
+            max-width: 950px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 242, 255, 0.05);
+        }
+
+        /* Left Side Image Frame */
+        .image-frame {
+            flex: 1;
+            max-width: 45%;
             position: relative;
+            overflow: hidden;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid var(--border-glass);
         }
 
-        .container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 120px;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--neon-pink), var(--neon-cyan), transparent);
-        }
-
-        .profile-frame {
-            width: 160px;
-            height: 160px;
-            margin: 0 auto 25px;
-            border-radius: 50%;
-            padding: 3px;
-            background: linear-gradient(135deg, var(--gold-accent), var(--neon-pink));
-            box-shadow: 0 0 30px rgba(255, 0, 85, 0.25);
-        }
-
-        .profile-img {
+        .image-frame img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            border-radius: 50%;
-            background-color: #121214;
+            object-position: center;
+            display: block;
         }
 
-        h1 {
-            font-size: 26px;
-            font-weight: 700;
+        /* Right Side: Content Panel */
+        .content-panel {
+            flex: 1.2;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #ffffff;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        header p {
+            font-size: 1rem;
+            color: #8a8a93;
             letter-spacing: 4px;
             text-transform: uppercase;
-            margin-bottom: 6px;
-            background: linear-gradient(90deg, #ffffff, var(--text-dim));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            margin-bottom: 40px;
         }
 
-        .subtitle {
-            font-size: 11px;
-            color: var(--gold-accent);
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            margin-bottom: 28px;
-            font-weight: 600;
-        }
-
-        .lore-box {
-            font-size: 13.5px;
-            color: var(--text-dim);
-            line-height: 1.6;
-            margin-bottom: 35px;
-            padding: 18px;
-            background: rgba(255, 255, 255, 0.015);
-            border-radius: 14px;
-            border-left: 3px solid var(--neon-pink);
-            text-align: left;
-        }
-
-        .links-wrapper {
+        .links-container {
             display: flex;
             flex-direction: column;
             gap: 16px;
         }
 
-        .btn {
+        /* Platform Links */
+        .platform-link {
             display: flex;
             align-items: center;
-            justify-content: center;
-            width: 100%;
-            padding: 18px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 16px;
-            color: var(--text-main);
+            justify-content: space-between;
+            padding: 18px 24px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
             text-decoration: none;
-            font-size: 13px;
+            color: var(--text-color);
             font-weight: 600;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            font-size: 1.05rem;
+            letter-spacing: 1px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
-        .btn:hover {
-            background: rgba(255, 255, 255, 0.06);
-            border-color: var(--neon-cyan);
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+        .platform-link:hover {
+            background: rgba(0, 242, 255, 0.08);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px var(--accent-glow);
             transform: translateY(-2px);
+            color: #ffffff;
         }
 
-        .btn-primary {
-            background: linear-gradient(90deg, rgba(255, 0, 85, 0.15), rgba(0, 243, 255, 0.15));
-            border-color: rgba(255, 0, 85, 0.4);
+        .platform-name {
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        .btn-primary:hover {
-            border-color: var(--neon-pink);
-            box-shadow: 0 0 25px rgba(255, 0, 85, 0.3);
+        .platform-name svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
         }
 
-        .footer-tag {
-            margin-top: 40px;
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.15);
-            letter-spacing: 3px;
+        .action-tag {
+            font-size: 0.8rem;
             text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #6a6a73;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .platform-link:hover .action-tag {
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+        }
+
+        /* Responsive Layout for Mobile */
+        @media (max-width: 768px) {
+            .hub-container {
+                flex-direction: column;
+            }
+            .image-frame {
+                max-width: 100%;
+                height: 450px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-glass);
+            }
+            .content-panel {
+                padding: 30px 20px;
+                text-align: center;
+            }
+            header h1 {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="profile-frame">
-            <img src="face.jpg.png" alt="Akiro Laine" class="profile-img">
+    <div class="hub-container">
+        <!-- Full Body Image Frame -->
+        <div class="image-frame">
+            <img src="full_body.jpg" alt="Akiro Laine">
         </div>
 
-        <h1>Akiro Laine</h1>
-        <div class="subtitle">Dystopian Matriarch // Sonic Architect</div>
+        <!-- Links Panel -->
+        <div class="content-panel">
+            <header>
+                <h1>Akiro Laine</h1>
+                <p>Official Sound & Media Hub</p>
+            </header>
 
-        <div class="lore-box">
-            Absorbing the raw excess of high society, she repurposes corporate asset data into subterranean sonic frequencies. A delicate, hyper-sensual subversion of traditional class and luxury lines.
+            <div class="links-container">
+                <!-- Spotify Album Link -->
+                <a href="https://open.spotify.com/album/3SbWVRs3AOhfW8C1Izz2yk" target="_blank" class="platform-link">
+                    <div class="platform-name">
+                        <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.496 17.306c-.215.353-.676.463-1.028.249-2.856-1.745-6.452-2.14-10.686-1.173-.404.092-.812-.162-.905-.565-.092-.404.162-.812.565-.905 4.634-1.059 8.599-.613 11.8 1.342.352.214.463.676.249 1.028zm1.478-3.26c-.27.439-.847.585-1.287.315-3.269-2.01-8.254-2.592-12.119-1.417-.496.15-.1.87-.245.975-.494-.149-.783-.679-.634-1.175.435-1.433 9.942-.782 13.725 1.545.44.27.586.848.316 1.287zm.126-3.413c-3.921-2.328-10.383-2.542-14.131-1.403-.602.183-1.233-.153-1.415-.754-.182-.602.153-1.233.754-1.415 4.307-1.308 11.442-1.053 15.908 1.6 1.542.322.613.947.291 1.264-.322.542-.947.291-1.264-.322z"/></svg>
+                        <span>Spotify</span>
+                    </div>
+                    <span class="action-tag">Listen</span>
+                </a>
+
+                <!-- Apple Music Link -->
+                <a href="https://music.apple.com/us/album/sin/6777102586" target="_blank" class="platform-link">
+                    <div class="platform-name">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 14.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5c0-.18.04-.36.1-.52L8.24 13.1c-.24-.07-.42-.24-.52-.47-.1-.23-.08-.49.06-.7l1.5-2.25c.2-.3.54-.48.92-.48h.3c.38 0 .72.18.92.48l1.5 2.25c.14.21.16.47.06.7-.1.23-.28.4-.52.47l-1.86 2.88c.06.16.1.34.1.52zm1.5-6.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                        <span>Apple Music</span>
+                    </div>
+                    <span class="action-tag">Stream</span>
+                </a>
+
+                <!-- YouTube Channel Link -->
+                <a href="https://www.youtube.com/@AkiroLaine" target="_blank" class="platform-link">
+                    <div class="platform-name">
+                        <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        <span>YouTube</span>
+                    </div>
+                    <span class="action-tag">Watch</span>
+                </a>
+            </div>
         </div>
-
-        <div class="links-wrapper">
-            <a href="https://youtube.com" target="_blank" class="btn btn-primary">Smart Link // Stream Latest Release</a>
-            <a href="https://spotify.com" target="_blank" class="btn">Spotify Profile</a>
-            <a href="https://apple.com" target="_blank" class="btn">Apple Music</a>
-            <a href="https://youtube.com" target="_blank" class="btn">YouTube Channel</a>
-            <a href="https://tiktok.com" target="_blank" class="btn">TikTok Archive</a>
-        </div>
-
-        <div class="footer-tag">SYS_BOOT_REv.404 // AKIROLAINE.COM</div>
     </div>
 
 </body>
