@@ -262,16 +262,15 @@
     const canvas = document.getElementById("particles");
     const ctx = canvas.getContext("2d", { alpha: true });
 
-    const settings = {
-      subjectParticles: 2500,
-      floatingParticles: 1300,
-      sampleWidth: 250,
-      particleSizeMin: 2.2,
-      particleSizeMax: 6.2,
-      pullStrength: 0.018,
-      damping: 0.91,
-      flowStrength: 0.32,
-      glowChance: 0.18
+    const desktopReference = {
+      width: 1440,
+      height: 900,
+      subjectParticles: 5500,
+      floatingParticles: 850
+    };
+
+    const imageSampling = {
+      sampleWidth: 250
     };
 
     let width = 0;
@@ -279,8 +278,15 @@
     let dpr = 1;
 
     let img = new Image();
+
+    let candidatePixels = [];
     let subjectParticles = [];
     let floatingParticles = [];
+
+    let activeSettings = null;
+    let resizeTimer = null;
+    let imageReady = false;
+
     let imageRect = {
       x: 0,
       y: 0,
@@ -289,17 +295,20 @@
     };
 
     img.crossOrigin = "anonymous";
+
     img.onload = () => {
+      imageReady = true;
       resize();
-      buildParticlesFromImage();
-      buildFloatingParticles();
+      extractCandidatePixels();
+      rebuildAllParticles();
       requestAnimationFrame(animate);
     };
 
     img.onerror = () => {
       console.error("Could not load image:", IMAGE_PATH);
+      imageReady = false;
       resize();
-      buildFloatingParticles();
+      rebuildAllParticles();
       requestAnimationFrame(animate);
     };
 
@@ -307,11 +316,78 @@
 
     window.addEventListener("resize", () => {
       resize();
-      rebuildParticleTargets();
+
+      clearTimeout(resizeTimer);
+
+      resizeTimer = setTimeout(() => {
+        const nextSettings = getResponsiveSettings();
+
+        if (
+          !activeSettings ||
+          Math.abs(nextSettings.subjectParticles - activeSettings.subjectParticles) > 120 ||
+          Math.abs(nextSettings.floatingParticles - activeSettings.floatingParticles) > 40
+        ) {
+          rebuildAllParticles();
+        } else {
+          rebuildParticleTargetsOnly();
+        }
+      }, 180);
     });
 
+    function getResponsiveSettings() {
+      const screenArea = width * height;
+      const referenceArea = desktopReference.width * desktopReference.height;
+
+      let areaScale = screenArea / referenceArea;
+
+      const isPhone = width <= 700;
+      const isSmallPhone = width <= 430;
+
+      areaScale = clamp(areaScale, 0.18, 1.0);
+
+      let mobilePenalty = 1;
+
+      if (isSmallPhone) {
+        mobilePenalty = 0.66;
+      } else if (isPhone) {
+        mobilePenalty = 0.76;
+      }
+
+      const subjectParticles = Math.round(
+        desktopReference.subjectParticles * areaScale * mobilePenalty
+      );
+
+      const floatingParticles = Math.round(
+        desktopReference.floatingParticles * areaScale * (isPhone ? 0.55 : 1)
+      );
+
+      return {
+        isPhone,
+
+        subjectParticles: clampInt(subjectParticles, isPhone ? 850 : 2200, desktopReference.subjectParticles),
+        floatingParticles: clampInt(floatingParticles, isPhone ? 90 : 260, desktopReference.floatingParticles),
+
+        particleSizeMin: isPhone ? 1.25 : 2.0,
+        particleSizeMax: isPhone ? 3.8 : 5.8,
+
+        pullStrength: isPhone ? 0.016 : 0.018,
+        damping: isPhone ? 0.925 : 0.91,
+        flowStrength: isPhone ? 0.16 : 0.30,
+
+        glowChance: isPhone ? 0.055 : 0.16,
+        alphaMultiplier: isPhone ? 0.62 : 1.0,
+
+        orbitMin: isPhone ? 4 : 8,
+        orbitMax: isPhone ? 18 : 42
+      };
+    }
+
     function resize() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const isPhone = window.innerWidth <= 700;
+
+      dpr = isPhone
+        ? Math.min(window.devicePixelRatio || 1, 1.5)
+        : Math.min(window.devicePixelRatio || 1, 2);
 
       width = window.innerWidth;
       height = window.innerHeight;
@@ -338,8 +414,10 @@
       imageRect.y = (height - imageRect.h) / 2;
     }
 
-    function buildParticlesFromImage() {
-      const sampleWidth = settings.sampleWidth;
+    function extractCandidatePixels() {
+      if (!imageReady) return;
+
+      const sampleWidth = imageSampling.sampleWidth;
       const sampleHeight = Math.round(sampleWidth * (img.height / img.width));
 
       const off = document.createElement("canvas");
@@ -386,76 +464,88 @@
       }
 
       shuffle(candidates);
+      candidatePixels = candidates;
+    }
 
-      subjectParticles = candidates
-        .slice(0, settings.subjectParticles)
-        .map((p) => {
-          const target = imageToScreen(p.sx, p.sy);
-          const color = makeParticleColor(p.r, p.g, p.b, p.density);
+    function rebuildAllParticles() {
+      activeSettings = getResponsiveSettings();
 
-          return {
-            sx: p.sx,
-            sy: p.sy,
-            tx: target.x,
-            ty: target.y,
+      buildSubjectParticles();
+      buildFloatingParticles();
+    }
 
-            x: target.x + randomRange(-width, width),
-            y: target.y + randomRange(-height, height),
+    function buildSubjectParticles() {
+      subjectParticles = [];
 
-            vx: 0,
-            vy: 0,
+      if (!candidatePixels.length) return;
 
-            size: randomRange(settings.particleSizeMin, settings.particleSizeMax),
-            angle: Math.random() * Math.PI * 2,
-            spin: randomRange(-0.035, 0.035),
-            seed: Math.random() * 1000,
-            orbit: randomRange(8, 42),
-            color,
-            alpha: randomRange(0.38, 0.92),
-            glow: Math.random() < settings.glowChance
-          };
-        });
+      const pool = candidatePixels.slice();
+      shuffle(pool);
+
+      const chosen = pool.slice(0, activeSettings.subjectParticles);
+
+      subjectParticles = chosen.map((p) => {
+        const target = imageToScreen(p.sx, p.sy);
+        const color = makeParticleColor(p.r, p.g, p.b, p.density);
+
+        return {
+          sx: p.sx,
+          sy: p.sy,
+          tx: target.x,
+          ty: target.y,
+
+          x: target.x + randomRange(-width, width),
+          y: target.y + randomRange(-height, height),
+
+          vx: 0,
+          vy: 0,
+
+          size: randomRange(activeSettings.particleSizeMin, activeSettings.particleSizeMax),
+          angle: Math.random() * Math.PI * 2,
+          spin: randomRange(-0.035, 0.035),
+          seed: Math.random() * 1000,
+          orbit: randomRange(activeSettings.orbitMin, activeSettings.orbitMax),
+          color,
+          alpha: randomRange(0.34, 0.86) * activeSettings.alphaMultiplier,
+          glow: Math.random() < activeSettings.glowChance
+        };
+      });
     }
 
     function buildFloatingParticles() {
       floatingParticles = [];
 
-      for (let i = 0; i < settings.floatingParticles; i++) {
-        const colorList = [
-          "rgba(255, 228, 92, 0.95)",
-          "rgba(255, 100, 190, 0.85)",
-          "rgba(120, 255, 180, 0.85)",
-          "rgba(90, 210, 255, 0.80)",
-          "rgba(255, 255, 255, 0.75)"
-        ];
+      const colorList = [
+        "rgba(255, 228, 92, 0.95)",
+        "rgba(255, 100, 190, 0.85)",
+        "rgba(120, 255, 180, 0.85)",
+        "rgba(90, 210, 255, 0.80)",
+        "rgba(255, 255, 255, 0.72)"
+      ];
 
+      for (let i = 0; i < activeSettings.floatingParticles; i++) {
         floatingParticles.push({
           x: Math.random() * width,
           y: Math.random() * height,
           vx: randomRange(-0.18, 0.18),
           vy: randomRange(-0.35, 0.12),
-          size: randomRange(1.8, 5.4),
+          size: randomRange(activeSettings.particleSizeMin, activeSettings.particleSizeMax),
           angle: Math.random() * Math.PI * 2,
           spin: randomRange(-0.025, 0.025),
           seed: Math.random() * 1000,
           color: colorList[Math.floor(Math.random() * colorList.length)],
-          alpha: randomRange(0.25, 0.78)
+          alpha: randomRange(0.22, 0.74) * activeSettings.alphaMultiplier
         });
       }
     }
 
-    function rebuildParticleTargets() {
+    function rebuildParticleTargetsOnly() {
       calculateImageRect();
 
       for (const p of subjectParticles) {
         const target = imageToScreen(p.sx, p.sy);
         p.tx = target.x;
         p.ty = target.y;
-      }
-
-      for (const p of floatingParticles) {
-        p.x = Math.random() * width;
-        p.y = Math.random() * height;
       }
     }
 
@@ -471,26 +561,29 @@
     }
 
     function drawSubjectParticles(t) {
+      if (!activeSettings) return;
+
       for (const p of subjectParticles) {
         const flowAngle =
           Math.sin(p.x * 0.006 + t * 0.9 + p.seed) +
           Math.cos(p.y * 0.005 - t * 0.7 + p.seed * 0.41);
 
-        const flowX = Math.cos(flowAngle * Math.PI) * settings.flowStrength;
-        const flowY = Math.sin(flowAngle * Math.PI) * settings.flowStrength;
+        const flowX = Math.cos(flowAngle * Math.PI) * activeSettings.flowStrength;
+        const flowY = Math.sin(flowAngle * Math.PI) * activeSettings.flowStrength;
 
         const orbitX = Math.cos(t * 0.8 + p.seed) * p.orbit;
         const orbitY = Math.sin(t * 0.7 + p.seed) * p.orbit;
 
         const pulse = Math.sin(t * 0.65 + p.seed) * 0.5 + 0.5;
+
         const targetX = p.tx + orbitX * pulse;
         const targetY = p.ty + orbitY * pulse;
 
-        p.vx += (targetX - p.x) * settings.pullStrength + flowX;
-        p.vy += (targetY - p.y) * settings.pullStrength + flowY;
+        p.vx += (targetX - p.x) * activeSettings.pullStrength + flowX;
+        p.vy += (targetY - p.y) * activeSettings.pullStrength + flowY;
 
-        p.vx *= settings.damping;
-        p.vy *= settings.damping;
+        p.vx *= activeSettings.damping;
+        p.vy *= activeSettings.damping;
 
         p.x += p.vx;
         p.y += p.vy;
@@ -502,13 +595,15 @@
     }
 
     function drawFloatingParticles(t) {
+      if (!activeSettings) return;
+
       for (const p of floatingParticles) {
         const flowAngle =
           Math.sin(p.x * 0.004 + t * 0.45 + p.seed) +
           Math.cos(p.y * 0.006 - t * 0.35 + p.seed);
 
-        p.vx += Math.cos(flowAngle * Math.PI) * 0.035;
-        p.vy += Math.sin(flowAngle * Math.PI) * 0.035;
+        p.vx += Math.cos(flowAngle * Math.PI) * 0.026;
+        p.vy += Math.sin(flowAngle * Math.PI) * 0.026;
 
         p.vx *= 0.985;
         p.vy *= 0.985;
@@ -537,7 +632,7 @@
 
       if (glow) {
         ctx.shadowColor = color;
-        ctx.shadowBlur = size * 2.2;
+        ctx.shadowBlur = size * 2.1;
       } else {
         ctx.shadowBlur = 0;
       }
@@ -591,7 +686,7 @@
     }
 
     function makeParticleColor(r, g, b, density) {
-      const boost = 0.9 + density * 0.65;
+      const boost = 0.88 + density * 0.62;
 
       const rr = Math.min(255, Math.floor((r * 255 + 36) * boost));
       const gg = Math.min(255, Math.floor((g * 255 + 18) * boost));
@@ -614,6 +709,14 @@
 
     function randomRange(min, max) {
       return min + Math.random() * (max - min);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function clampInt(value, min, max) {
+      return Math.round(Math.max(min, Math.min(max, value)));
     }
 
     function shuffle(array) {
