@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Particle Form</title>
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #070010; font-family: system-ui, sans-serif; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #070010; font-family: sans-serif; }
     canvas { position: fixed; inset: 0; display: block; }
-    .social-links { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 40px; z-index: 10; }
-    .social-links a { color: rgba(255, 255, 255, 0.7); text-decoration: none; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; transition: color 0.3s ease; }
+    .social-links { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 40px; z-index: 20; }
+    .social-links a { color: rgba(255, 255, 255, 0.7); text-decoration: none; font-size: 14px; text-transform: uppercase; }
     .social-links a:hover { color: #ffffff; }
   </style>
 </head>
@@ -23,21 +23,57 @@
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
     
-    // Ensure face_chest.png is in your folder
-    const IMAGE_SRC = "./face_chest.png";
-    const SETTINGS = { maxParticles: 38000, sampleWidth: 280, sampleStep: 2, densityThreshold: 0.05, formScale: 3.15, formDepth: 95, particleSize: 2.45, returnForce: 0.018, turbulenceForce: 0.42, swirlForce: 0.00085, damping: 0.915, noiseScale: 0.006, noiseSpeed: 0.17 };
+    // 1. CONFIGURATION
+    const IMAGE_SRC = "./face_chest.png"; // Ensure your file is named exactly this
+    const SETTINGS = { maxParticles: 30000, sampleWidth: 200, sampleStep: 2, densityThreshold: 0.1, formScale: 3, formDepth: 50, particleSize: 2, returnForce: 0.02, turbulenceForce: 0.3, swirlForce: 0.001, damping: 0.9, noiseScale: 0.005, noiseSpeed: 0.1 };
 
+    // 2. SETUP SCENE
     const canvas = document.getElementById("stage");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
     const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000);
-    camera.position.z = 500;
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1000);
+    camera.position.z = 1;
 
-    // --- INCLUDE ALL ORIGINAL LOGIC HERE ---
-    // Copy/Paste your original 'init', 'extractParticlesFromImage', 'animate', 'PerlinNoise', 
-    // and 'fitCamera' functions here inside this script tag.
-    
-    console.log("Ready to render. Ensure all logic functions are included.");
+    // 3. LOAD IMAGE & RUN
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+        console.log("Image loaded!");
+        initParticles(img);
+    };
+    img.onerror = () => alert("Error: Could not load face_chest.png. Ensure it is in the same folder.");
+    img.src = IMAGE_SRC;
+
+    function initParticles(img) {
+        const offscreen = document.createElement("canvas");
+        offscreen.width = SETTINGS.sampleWidth;
+        offscreen.height = (img.height / img.width) * SETTINGS.sampleWidth;
+        const ctx = offscreen.getContext("2d");
+        ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
+        const data = ctx.getImageData(0, 0, offscreen.width, offscreen.height).data;
+
+        const pos = [];
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 128) { // Only keep opaque pixels
+                const x = (i / 4) % offscreen.width;
+                const y = Math.floor((i / 4) / offscreen.width);
+                pos.push((x - offscreen.width/2) * 2, (offscreen.height/2 - y) * 2, 0);
+            }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        const material = new THREE.PointsMaterial({ size: SETTINGS.particleSize, color: 0xffffff, transparent: true });
+        const points = new THREE.Points(geometry, material);
+        scene.add(points);
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+    }
   </script>
 </body>
 </html>
